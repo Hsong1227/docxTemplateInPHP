@@ -160,51 +160,73 @@ class DocxTemplate {
         }
 
     }
-    
-    private function formatValue($keyValue,$keyOptions){
-    	if($keyValue !== false){
-    		if(array_key_exists("numberFormat",$keyOptions)){
-    			switch(strtolower($keyOptions["numberFormat"])){
-    				case "inwords":
-    					$noToWords = new \Numbers_Words();
-    					$keyValue = $noToWords->toCurrency($keyValue,$this->locale);
-    					break;
-    				case "currency":
-    					if($this->locale == "en_IN"){
-    						$keyValue = "".$keyValue;
-    						$keyValue = preg_replace("/\,/","",$keyValue);
-    	
-    						$keyValueSplit = preg_split("/\./",$keyValue);
-    						$decimalPart = $keyValueSplit[0];
-    						$fractionPart = "00";
-    						if(count($keyValueSplit) > 1){
-    							$fractionPart = $keyValueSplit[1];
-    						}
-    	
-    						$processedDecimalPart = "";
-    						$decimalPart = strrev($decimalPart);
-    						$decimalPart = str_split($decimalPart);
-    						for($k=0;$k<count($decimalPart);$k++){
-    							if($k == 3 || $k == 5 || $k == 7 || $k == 9 || $k == 11 || $k == 13){
-    								$processedDecimalPart = ",".$processedDecimalPart;
-    							}
-    							$processedDecimalPart = $decimalPart[$k].$processedDecimalPart;
-    						}
-    						if(strlen($fractionPart) == 1){
-    							$fractionPart = $fractionPart."0";
-    						}
-    						$keyValue = $processedDecimalPart.".".$fractionPart;
-    	
-    					}else{
-    						$keyValue = number_format($keyValue,2);
-    					}
-    			}
-    		}
+
+    private function formatValue($keyValue, $keyOptions, $repeatingKeyValue = [])
+    {
+        if ($keyValue !== false) {
+            if (array_key_exists("numberFormat", $keyOptions)) {
+                switch (strtolower($keyOptions["numberFormat"])) {
+                    case "inwords":
+                        $noToWords = new \Numbers_Words();
+                        $keyValue = $noToWords->toCurrency($keyValue, $this->locale);
+                        break;
+                    case "currency":
+                        if ($this->locale == "en_IN") {
+                            $keyValue = "" . $keyValue;
+                            $keyValue = preg_replace("/\,/", "", $keyValue);
+
+                            $keyValueSplit = preg_split("/\./", $keyValue);
+                            $decimalPart = $keyValueSplit[0];
+                            $fractionPart = "00";
+                            if (count($keyValueSplit) > 1) {
+                                $fractionPart = $keyValueSplit[1];
+                            }
+
+                            $processedDecimalPart = "";
+                            $decimalPart = strrev($decimalPart);
+                            $decimalPart = str_split($decimalPart);
+                            for ($k = 0; $k < count($decimalPart); $k++) {
+                                if ($k == 3 || $k == 5 || $k == 7 || $k == 9 || $k == 11 || $k == 13) {
+                                    $processedDecimalPart = "," . $processedDecimalPart;
+                                }
+                                $processedDecimalPart = $decimalPart[$k] . $processedDecimalPart;
+                            }
+                            if (strlen($fractionPart) == 1) {
+                                $fractionPart = $fractionPart . "0";
+                            }
+                            $keyValue = $processedDecimalPart . "." . $fractionPart;
+
+                        } else {
+                            $keyValue = number_format($keyValue, 2);
+                        }
+                }
+            }
             if (array_key_exists('repeatDelimiter', $keyOptions)) {
+                if (array_key_exists('currentPrefix', $keyOptions)) {
+                    $keyValue = $keyOptions['currentPrefix'] . $keyValue;
+                }
+                if (array_key_exists('repeatAttributes', $keyOptions)) {
+                    $keyValue .= $this->formatRepeatAttributes2String($keyOptions['repeatAttributes'],
+                        $repeatingKeyValue);
+
+                }
                 $keyValue .= $keyOptions['repeatDelimiter'];
             }
-    	}
-    	return $keyValue;
+        }
+        return $keyValue;
+    }
+
+
+    private function formatRepeatAttributes2String($repeatAttributes, $repeatingKeyValue)
+    {
+        $arr = explode(',', $repeatAttributes);
+        $restfulString = '';
+        foreach ($arr as $key => $value) {
+            $valueArray = explode('|', $value);
+            $restfulString .= $valueArray[0] . ($repeatingKeyValue[$valueArray[1]] ?? '');
+        }
+        return $restfulString;
+
     }
 
     private function parseXMLElement(\DOMElement $xmlElement,$data){
@@ -243,7 +265,8 @@ class DocxTemplate {
                             					if(!is_string($repeatingValue)){
                             						$repeatingValue = json_encode($repeatingValue);
                             					}
-                            					$repeatingValue = $this->formatValue($repeatingValue, $keyOptions);
+                                                $repeatingValue = $this->formatValue($repeatingValue, $keyOptions,
+                                                    $repeatingKeyValue);
                             					$textContent = $textContent.$repeatingValue;
                             				}else{
                             					if($this->development){
